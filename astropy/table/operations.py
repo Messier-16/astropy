@@ -805,7 +805,7 @@ def hstack(
 
 def unique(input_table, keys=None, silent=False, keep="first"):
     """
-    Returns the unique rows of a table.
+    Return a new table with unique rows, sorted by ``keys``.
 
     Parameters
     ----------
@@ -1275,7 +1275,7 @@ def _join(
 
     out = _get_out_class([left, right])()
 
-    for out_name, dtype, shape in out_descrs:
+    for out_name, _dtype, _shape in out_descrs:
         if out_name == cartesian_index_name:
             continue
 

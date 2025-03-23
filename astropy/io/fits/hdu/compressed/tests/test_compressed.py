@@ -372,7 +372,7 @@ class TestCompressedImage(FitsTestCase):
             assert hdul[1].header["BZERO"] == orig_bzero
             assert hdul[1].header["BSCALE"] == orig_bscale
 
-            zero_point = int(math.floor(-orig_bzero / orig_bscale))
+            zero_point = math.floor(-orig_bzero / orig_bscale)
             assert (hdul[1].data[0] == zero_point).all()
 
         with fits.open(self.temp("scale.fits")) as hdul:
@@ -995,6 +995,17 @@ class TestCompressedImage(FitsTestCase):
                 ),
             ]
             assert not hdul[1]._data_loaded
+
+    def test_fileinfo(self):
+        with fits.open(self.data("comp.fits")) as hdul:
+            res = hdul.fileinfo(1)
+
+        assert res["datLoc"] == 14400
+        assert res["datSpan"] == 72000
+        assert res["filemode"] == "readonly"
+        assert res["filename"] == self.data("comp.fits")
+        assert res["hdrLoc"] == 2880
+        assert not res["resized"]
 
 
 class TestCompHDUSections:

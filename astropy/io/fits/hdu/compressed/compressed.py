@@ -562,14 +562,15 @@ class CompImageHDU(ImageHDU):
 
         bintable.data = data
 
-    def _prewriteto(self, checksum=False, inplace=False):
+    def _prewriteto(self, inplace=False):
         if (
             self._bintable is not None
             and not self._has_data
             and not self.header._modified
         ):
             self._tmp_bintable = self._bintable
-            return self._tmp_bintable._prewriteto(checksum=checksum, inplace=inplace)
+            self._tmp_bintable._output_checksum = self._output_checksum
+            return self._tmp_bintable._prewriteto(inplace=inplace)
 
         if self._scale_back:
             self._scale_internal(
@@ -588,7 +589,8 @@ class CompImageHDU(ImageHDU):
             self._bintable.data = self._tmp_bintable.data
             self._tmp_bintable = self._bintable
 
-        return self._tmp_bintable._prewriteto(checksum=checksum, inplace=inplace)
+        self._tmp_bintable._output_checksum = self._output_checksum
+        return self._tmp_bintable._prewriteto(inplace=inplace)
 
     def _writeto(self, fileobj, inplace=False, copy=False):
         if self._tmp_bintable is not None:
@@ -697,6 +699,10 @@ class CompImageHDU(ImageHDU):
             return _ErrList(errs_filtered)
         else:
             return errs
+
+    def fileinfo(self):
+        if self._bintable is not None:
+            return self._bintable.fileinfo()
 
     @property
     def _data_offset(self):

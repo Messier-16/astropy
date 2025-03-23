@@ -200,7 +200,7 @@ work.
 Masking of mixin columns is enabled by the |Masked| class. See
 :ref:`utils-masked` for details.
 
-**ASCII table writing**
+**Text table writing**
 
 Tables with mixin columns can be written out to file using the
 `astropy.io.ascii` module, but the fast C-based writers are not available.
@@ -402,6 +402,11 @@ of the class and the handler function::
         1     1.0
         2     3.0
         3     4.0
+
+.. testcleanup::
+
+    >>> from astropy.table.mixins.registry import _handlers
+    >>> del _handlers['__main__.ExampleDataClass']
 
 Because we defined the data class as part of the example
 above, the fully qualified name starts with ``__main__``,

@@ -930,7 +930,7 @@ class HDUList(list, _Verify):
 
                 # only append HDU's which are "new"
                 if hdu._new:
-                    hdu._prewriteto(checksum=hdu._output_checksum)
+                    hdu._prewriteto()
                     with _free_space_check(self):
                         hdu._writeto(self._file)
                         if verbose:
@@ -1040,7 +1040,8 @@ class HDUList(list, _Verify):
         try:
             with _free_space_check(self, dirname=dirname):
                 for hdu in self:
-                    hdu._prewriteto(checksum=checksum)
+                    hdu._output_checksum = checksum
+                    hdu._prewriteto()
                     hdu._writeto(hdulist._file)
                     hdu._postwriteto()
         finally:
@@ -1424,7 +1425,7 @@ class HDUList(list, _Verify):
         for hdu in self:
             # Need to all _prewriteto() for each HDU first to determine if
             # resizing will be necessary
-            hdu._prewriteto(checksum=hdu._output_checksum, inplace=True)
+            hdu._prewriteto(inplace=True)
 
         try:
             self._wasresized()
@@ -1590,7 +1591,7 @@ class HDUList(list, _Verify):
                 # for CompImageHDU, we need to handle things a little differently
                 # because the HDU matching the header/data on disk is hdu._bintable
                 if isinstance(hdu, CompImageHDU):
-                    hdu = hdu._tmp_bintable
+                    hdu = hdu._bintable
                     if hdu is None:
                         continue
 

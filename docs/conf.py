@@ -35,9 +35,19 @@ from datetime import UTC, datetime
 from importlib import metadata
 from pathlib import Path
 
+import sphinx
 from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
 from sphinx.util import logging
+
+# xref: https://github.com/sphinx-doc/sphinx/issues/13232#issuecomment-2608708175
+if sys.version_info[:2] >= (3, 13) and sphinx.version_info[:2] < (8, 2):
+    import pathlib
+
+    from sphinx.util.typing import _INVALID_BUILTIN_CLASSES
+
+    _INVALID_BUILTIN_CLASSES[pathlib.Path] = "pathlib.Path"
+
 
 # from docs import global_substitutions
 
@@ -235,6 +245,9 @@ modindex_common_prefix = ["astropy."]
 
 html_theme_options.update(
     {
+        "analytics": {
+            "google_analytics_id": "G-R0510VK4B6",
+        },
         "github_url": "https://github.com/astropy/astropy",
         "external_links": [
             {"name": "Tutorials", "url": "https://learn.astropy.org/"},
@@ -379,43 +392,6 @@ for line in open("nitpick-exceptions"):
 suppress_warnings = [
     "config.cache",  # our rebuild is okay
 ]
-
-# -- Options for the Sphinx gallery -------------------------------------------
-
-try:
-    import warnings
-
-    import sphinx_gallery
-
-    extensions += ["sphinx_gallery.gen_gallery"]
-
-    sphinx_gallery_conf = {
-        "backreferences_dir": "generated/modules",  # path to store the module using example template
-        "filename_pattern": "^((?!skip_).)*$",  # execute all examples except those that start with "skip_"
-        "examples_dirs": f"..{os.sep}examples",  # path to the examples scripts
-        "gallery_dirs": "generated/examples",  # path to save gallery generated examples
-        "reference_url": {
-            "astropy": None,
-            "matplotlib": "https://matplotlib.org/stable/",
-            "numpy": "https://numpy.org/doc/stable/",
-        },
-        "abort_on_example_error": True,
-    }
-
-    # Filter out backend-related warnings as described in
-    # https://github.com/sphinx-gallery/sphinx-gallery/pull/564
-    warnings.filterwarnings(
-        "ignore",
-        category=UserWarning,
-        message=(
-            "Matplotlib is currently using agg, which is a"
-            " non-GUI backend, so cannot show the figure."
-        ),
-    )
-
-except ImportError:
-    sphinx_gallery = None
-
 
 # -- Options for linkcheck output -------------------------------------------
 linkcheck_retry = 5
@@ -632,6 +608,10 @@ links_to_become_substitutions: dict[str, str] = {
     "TOPCAT": "http://www.starlink.ac.uk/topcat",
     # OpenAstronomy
     "OpenAstronomy Packaging Guide": "https://packaging-guide.openastronomy.org/en/latest",
+    # Miscellaneous
+    "HDF5": "https://www.hdfgroup.org/HDF5",
+    "h5py": "http://www.h5py.org",
+    "Parquet": "https://parquet.apache.org",
 }
 
 processed_links = {
@@ -642,14 +622,6 @@ global_substitutions |= processed_links
 
 
 def setup(app):
-    if sphinx_gallery is None:
-        logger.warning(
-            "The sphinx_gallery extension is not installed, so the "
-            "gallery will not be built.  You will probably see "
-            "additional warnings about undefined references due "
-            "to this."
-        )
-
     # Generate the page from Jinja template
     app.connect("source-read", rstjinja)
     # Set this to higher priority than intersphinx; this way when building

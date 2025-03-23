@@ -91,7 +91,7 @@ class Covariance:
         # Print rows for params up to `max_lines`, round floats to 'round_val'
         longest_name = max(len(x) for x in self.param_names)
         ret_str = "parameter variances / covariances \n"
-        fstring = f'{"": <{longest_name}}| {{0}}\n'
+        fstring = f"{'': <{longest_name}}| {{0}}\n"
         for i, row in enumerate(self.cov_matrix):
             if i <= max_lines - 1:
                 param = self.param_names[i]
@@ -1010,10 +1010,11 @@ class FittingWithOutlierRemoval:
             filtered_data.mask = False
         filtered_weights = weights
         last_n_masked = filtered_data.mask.sum()
-        n = 0  # (allow recording no. of iterations when 0)
+        niter = 0  # (allow recording no. of iterations when 0)
 
         # Perform the iterative fitting:
-        for n in range(1, self.niter + 1):
+        for _ in range(1, self.niter + 1):
+            niter += 1
             # (Re-)evaluate the last model:
             model_vals = fitted_model(*coords, model_set_axis=False)
 
@@ -1105,7 +1106,7 @@ class FittingWithOutlierRemoval:
                 break
             last_n_masked = this_n_masked
 
-        self.fit_info = {"niter": n}
+        self.fit_info = {"niter": niter}
         self.fit_info.update(getattr(self.fitter, "fit_info", {}))
 
         return fitted_model, filtered_data.mask
@@ -1175,8 +1176,10 @@ class _NonLinearLSQFitter(Fitter):
             raise NonFiniteValueError(
                 "Objective function has encountered a non-finite value, "
                 "this will cause the fit to fail!\n"
-                "Please remove non-finite values from your input data before "
-                "fitting to avoid this error."
+                "This can be caused by non-finite values in the input data "
+                "or weights, which can be removed with fit(..., "
+                "filter_non_finite=True), or by diverging model parameters "
+                "that yield non-finite model values."
             )
 
         return value
@@ -2196,7 +2199,7 @@ def fitter_to_model_params_array(
         # Update model parameters before calling ``tied`` constraints.
         model.parameters = parameters
 
-        for idx, name in enumerate(model.param_names):
+        for name in model.param_names:
             if model.tied[name]:
                 value = model.tied[name](model)
                 slice_ = param_metrics[name]["slice"]

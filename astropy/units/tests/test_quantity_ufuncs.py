@@ -14,7 +14,6 @@ from erfa import ufunc as erfa_ufunc
 from numpy.testing import assert_allclose, assert_array_equal
 
 from astropy import units as u
-from astropy.tests.helper import PYTEST_LT_8_0
 from astropy.units import quantity_helper as qh
 from astropy.units.quantity_helper.converters import UfuncHelpers
 from astropy.units.quantity_helper.helpers import helper_sqrt
@@ -125,6 +124,13 @@ class TestUfuncHelpers:
         }
         assert all_q_ufuncs - all_np_ufuncs - all_erfa_ufuncs == set()
 
+    @pytest.mark.skipif(
+        HAS_SCIPY,
+        reason=(
+            "UFUNC_HELPERS.modules might be in a different state "
+            "(by design) if scipy.special already registered"
+        ),
+    )
     def test_scipy_registered(self):
         # Should be registered as existing even if scipy is not available.
         assert "scipy.special" in qh.UFUNC_HELPERS.modules
@@ -149,7 +155,7 @@ class TestUfuncHelpers:
 
         workers = 8
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            for p in range(10000):
+            for _ in range(10000):
                 helpers = UfuncHelpers()
                 helpers.register_module(
                     "astropy.units.tests.test_quantity_ufuncs",
@@ -329,11 +335,13 @@ class TestQuantityTrigonometricFuncs:
         # Non-quantity input should be treated as dimensionless and thus cannot
         # be converted to radians.
         out = u.Quantity(0)
-        match = "'NoneType' object has no attribute 'get_converter'"
-        if not PYTEST_LT_8_0:
-            # pytest < 8 does not know how to deal with Exception.add_note
-            match += ".*\n.*treated as dimensionless"
-        with pytest.raises(AttributeError, match=match):
+        with pytest.raises(
+            AttributeError,
+            match=(
+                "'NoneType' object has no attribute 'get_converter'"
+                ".*\n.*treated as dimensionless"
+            ),
+        ):
             np.sin(0.5, out=out)
 
         # Except if we have the right equivalency in place.
@@ -1563,7 +1571,9 @@ if HAS_SCIPY:
 
     def test_scipy_registration():
         """Check that scipy gets loaded upon first use."""
-        assert sps.erf not in qh.UFUNC_HELPERS
+        if sps.erf in qh.UFUNC_HELPERS:
+            # Generally, scipy will not be loaded here, but in a double run it might.
+            pytest.skip()
         sps.erf(1.0 * u.percent)
         assert sps.erf in qh.UFUNC_HELPERS
 

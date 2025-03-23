@@ -746,7 +746,9 @@ class Table:
             names_from_list_of_dict = _get_names_from_list_of_dict(rows)
             if names_from_list_of_dict:
                 data = rows
-            elif isinstance(rows, self.Row):
+            elif isinstance(rows, self.Row) or (
+                isinstance(rows, np.ndarray) and rows.dtype.names
+            ):
                 data = rows
             else:
                 data = list(zip(*rows))
@@ -781,7 +783,16 @@ class Table:
                 f"__init__() got unexpected keyword argument {next(iter(kwargs.keys()))!r}"
             )
 
-        if isinstance(data, np.ndarray) and data.shape == (0,) and not data.dtype.names:
+        # Treat any empty numpy array as None, except for structured arrays since they
+        # provide column names and dtypes.
+        #
+        # Init with rows=[] or data=[] (or tuples) is allowed and taken to mean no data.
+        # This allows supplying names and dtype if desired. `data=[]` is ambiguous,
+        # because it could mean no columns, or it could mean no rows for list of dict.
+        # For compatibility with the latter, interpret data=[] as data=None.
+        if (
+            isinstance(data, np.ndarray) and data.size == 0 and not data.dtype.names
+        ) or (isinstance(data, (list, tuple)) and len(data) == 0):
             data = None
 
         if isinstance(data, self.Row):
@@ -1075,8 +1086,17 @@ class Table:
             Indexing engine class to use, either `~astropy.table.SortedArray`,
             `~astropy.table.BST`, or `~astropy.table.SCEngine`. If the supplied
             argument is None (by default), use `~astropy.table.SortedArray`.
-        unique : bool
-            Whether the values of the index must be unique. Default is False.
+        unique : bool (default: False)
+            If set to True, an exception will be raised if duplicate rows exist.
+
+        Raises
+        ------
+        ValueError
+            If any selected column does not support indexing, or has more than
+            one dimension.
+        ValueError
+            If unique=True and duplicate rows are found.
+
         """
         if isinstance(colnames, str):
             colnames = (colnames,)
@@ -3894,7 +3914,7 @@ class Table:
                 # other = {'a': 2, 'b': 2} and then equality does a
                 # column-by-column broadcasting.
                 names = self.colnames
-                other = {name: other for name in names}
+                other = dict.fromkeys(names, other)
 
         # Require column names match but do not require same column order
         if set(self.colnames) != set(names):
@@ -3968,6 +3988,11 @@ class Table:
         -------
         out : `~astropy.table.Table`
             New table with groups set
+
+        Notes
+        -----
+        The underlying sorting algorithm is guaranteed stable, meaning that the
+        original table order is preserved within each group.
         """
         return groups.table_group_by(self, keys)
 
@@ -4098,15 +4123,13 @@ class Table:
 
         badcols = [name for name, col in self.columns.items() if len(col.shape) > 1]
         if badcols:
-            # fmt: off
             raise ValueError(
-                f'Cannot convert a table with multidimensional columns to a '
-                f'pandas DataFrame. Offending columns are: {badcols}\n'
-                f'One can filter out such columns using:\n'
-                f'names = [name for name in tbl.colnames if len(tbl[name].shape) <= 1]\n'
-                f'tbl[names].to_pandas(...)'
+                f"Cannot convert a table with multidimensional columns to a "
+                f"pandas DataFrame. Offending columns are: {badcols}\n"
+                f"One can filter out such columns using:\n"
+                f"names = [name for name in tbl.colnames if len(tbl[name].shape) <= 1]\n"
+                f"tbl[names].to_pandas(...)"
             )
-            # fmt: on
 
         out = OrderedDict()
 

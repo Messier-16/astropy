@@ -13,9 +13,6 @@ import io
 import os
 import re
 import shutil
-
-# import ssl moved inside functions using ssl to avoid import failure
-# when running in pyodide/Emscripten
 import sys
 import urllib.error
 import urllib.parse
@@ -23,6 +20,7 @@ import urllib.request
 import zipfile
 from importlib import import_module
 from tempfile import NamedTemporaryFile, TemporaryDirectory, gettempdir
+from types import MappingProxyType
 from warnings import warn
 
 import astropy_iers_data
@@ -1550,6 +1548,10 @@ def download_file(
                 e.reason.strerror = f"{e.reason.strerror}. requested URL: {remote_url}"
                 e.reason.args = (e.reason.errno, e.reason.strerror)
             errors[source_url] = e
+
+        except TimeoutError as e:
+            errors[source_url] = e
+
     else:  # No success
         if not sources:
             raise KeyError(
@@ -1628,7 +1630,7 @@ def cache_total_size(pkgname="astropy"):
     """Return the total size in bytes of all files in the cache."""
     size = 0
     dldir = _get_download_cache_loc(pkgname=pkgname)
-    for root, dirs, files in os.walk(dldir):
+    for root, _, files in os.walk(dldir):
         size += sum(os.path.getsize(os.path.join(root, name)) for name in files)
     return size
 
@@ -1915,12 +1917,7 @@ def _url_to_dirname(url):
     return hashlib.md5(url_c.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
-class ReadOnlyDict(dict):
-    def __setitem__(self, key, value):
-        raise TypeError("This object is read-only.")
-
-
-_NOTHING = ReadOnlyDict({})
+_NOTHING = MappingProxyType({})
 
 
 class CacheDamaged(ValueError):
@@ -2185,7 +2182,7 @@ def cache_contents(pkgname="astropy"):
                     os.path.join(dldir, entry.name, "url"), encoding="utf-8"
                 )
                 r[url] = os.path.abspath(os.path.join(dldir, entry.name, "contents"))
-    return ReadOnlyDict(r)
+    return MappingProxyType(r)
 
 
 def export_download_cache(

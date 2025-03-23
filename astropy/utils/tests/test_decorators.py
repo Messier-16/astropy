@@ -4,11 +4,10 @@ import concurrent.futures
 import inspect
 import pickle
 import sys
-from contextlib import nullcontext
 
 import pytest
 
-from astropy.tests.helper import PYTEST_LT_8_0
+from astropy.tests.helper import _skip_docstring_tests_with_optimized_python
 from astropy.utils.decorators import (
     classproperty,
     deprecated,
@@ -417,19 +416,14 @@ def test_deprecated_argument_relaxed():
     assert len(w) == 1
 
     # Using both. Both keyword
-    if PYTEST_LT_8_0:
-        ctx = nullcontext()
-    else:
-        ctx = pytest.warns(AstropyDeprecationWarning)
-
-    with ctx, pytest.warns(AstropyUserWarning) as w:
+    with pytest.warns(AstropyDeprecationWarning), pytest.warns(AstropyUserWarning) as w:
         assert test(clobber=2, overwrite=1) == 1
     assert len(w) == 2
     assert '"clobber" was deprecated' in str(w[0].message)
     assert '"clobber" and "overwrite" keywords were set' in str(w[1].message)
 
     # One positional, one keyword
-    with ctx, pytest.warns(AstropyUserWarning) as w:
+    with pytest.warns(AstropyDeprecationWarning), pytest.warns(AstropyUserWarning) as w:
         assert test(1, clobber=2) == 1
     assert len(w) == 2
     assert '"clobber" was deprecated' in str(w[0].message)
@@ -471,20 +465,15 @@ def test_deprecated_argument_multi_deprecation():
     assert len(w) == 3
 
     # Make sure relax is valid for all arguments
-    if PYTEST_LT_8_0:
-        ctx = nullcontext()
-    else:
-        ctx = pytest.warns(AstropyDeprecationWarning)
-
-    with ctx, pytest.warns(AstropyUserWarning) as w:
+    with pytest.warns(AstropyDeprecationWarning), pytest.warns(AstropyUserWarning) as w:
         assert test(x=1, y=2, z=3, b=3) == (1, 3, 3)
     assert len(w) == 4
 
-    with ctx, pytest.warns(AstropyUserWarning) as w:
+    with pytest.warns(AstropyDeprecationWarning), pytest.warns(AstropyUserWarning) as w:
         assert test(x=1, y=2, z=3, a=3) == (3, 2, 3)
     assert len(w) == 4
 
-    with ctx, pytest.warns(AstropyUserWarning) as w:
+    with pytest.warns(AstropyDeprecationWarning), pytest.warns(AstropyUserWarning) as w:
         assert test(x=1, y=2, z=3, c=5) == (1, 2, 5)
     assert len(w) == 4
 
@@ -496,21 +485,15 @@ def test_deprecated_argument_multi_deprecation_2():
     def test(a, b, c):
         return a, b, c
 
-    if PYTEST_LT_8_0:
-        ctx1 = nullcontext()
-        ctx2 = pytest.warns(AstropyUserWarning)
-    else:
-        ctx1 = ctx2 = pytest.warns(AstropyDeprecationWarning)
-
-    with ctx1, pytest.warns(AstropyUserWarning) as w:
+    with pytest.warns(AstropyDeprecationWarning), pytest.warns(AstropyUserWarning) as w:
         assert test(x=1, y=2, z=3, b=3) == (1, 3, 3)
     assert len(w) == 4
 
-    with ctx1, pytest.warns(AstropyUserWarning) as w:
+    with pytest.warns(AstropyDeprecationWarning), pytest.warns(AstropyUserWarning) as w:
         assert test(x=1, y=2, z=3, a=3) == (3, 2, 3)
     assert len(w) == 4
 
-    with pytest.raises(TypeError), ctx2:
+    with pytest.raises(TypeError), pytest.warns(AstropyDeprecationWarning):
         assert test(x=1, y=2, z=3, c=5) == (1, 2, 5)
 
 
@@ -640,7 +623,7 @@ def test_classproperty_lazy_threadsafe(fast_thread_switching):
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         # This is testing for race conditions, so try many times in the
         # hope that we'll get the timing right.
-        for p in range(10000):
+        for _ in range(10000):
 
             class A:
                 @classproperty(lazy=True)
@@ -678,7 +661,7 @@ def test_lazyproperty_threadsafe(fast_thread_switching):
 
     workers = 8
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-        for p in range(10000):
+        for _ in range(10000):
             a = A()
             futures = [executor.submit(lambda: a.foo) for i in range(workers)]
             values = [future.result() for future in futures]
@@ -687,6 +670,7 @@ def test_lazyproperty_threadsafe(fast_thread_switching):
             assert values == [a.foo] * workers
 
 
+@_skip_docstring_tests_with_optimized_python
 def test_format_doc_stringInput_simple():
     # Simple tests with string input
     docstring = "test"
@@ -696,17 +680,17 @@ def test_format_doc_stringInput_simple():
     def testfunc_1():
         pass
 
-    expected_doc = docstring if sys.flags.optimize < 2 else None
-    assert inspect.getdoc(testfunc_1) == expected_doc
+    assert inspect.getdoc(testfunc_1) == "test"
 
     # Test that it replaces an existing docstring
     @format_doc(docstring)
     def testfunc_2():
         """not test"""
 
-    assert inspect.getdoc(testfunc_2) == expected_doc
+    assert inspect.getdoc(testfunc_2) == "test"
 
 
+@_skip_docstring_tests_with_optimized_python
 def test_format_doc_stringInput_format():
     # Tests with string input and formatting
 
@@ -717,8 +701,7 @@ def test_format_doc_stringInput_format():
     def testfunc2():
         pass
 
-    expected_doc = "yes / no = life" if sys.flags.optimize < 2 else None
-    assert inspect.getdoc(testfunc2) == expected_doc
+    assert inspect.getdoc(testfunc2) == "yes / no = life"
 
     # Test that we can include the original docstring
 
@@ -728,8 +711,7 @@ def test_format_doc_stringInput_format():
     def testfunc3():
         """= 2 / 2 * life"""
 
-    expected_doc = "yes / no = 2 / 2 * life" if sys.flags.optimize < 2 else None
-    assert inspect.getdoc(testfunc3) == expected_doc
+    assert inspect.getdoc(testfunc3) == "yes / no = 2 / 2 * life"
 
 
 def test_format_doc_objectInput_simple():
@@ -753,6 +735,7 @@ def test_format_doc_objectInput_simple():
     assert inspect.getdoc(testfunc_2) == inspect.getdoc(docstring0)
 
 
+@_skip_docstring_tests_with_optimized_python
 def test_format_doc_objectInput_format():
     # Tests with object input and formatting
 
@@ -764,9 +747,7 @@ def test_format_doc_objectInput_format():
     def testfunc2():
         pass
 
-    expected_doc = "test + test = 2 * test" if sys.flags.optimize < 2 else None
-
-    assert inspect.getdoc(testfunc2) == expected_doc
+    assert inspect.getdoc(testfunc2) == "test + test = 2 * test"
 
     # Test that we can include the original docstring
 
@@ -777,11 +758,10 @@ def test_format_doc_objectInput_format():
     def testfunc3():
         """= 4 / 2 * test"""
 
-    expected_doc = "test + test = 4 / 2 * test" if sys.flags.optimize < 2 else None
-
-    assert inspect.getdoc(testfunc3) == expected_doc
+    assert inspect.getdoc(testfunc3) == "test + test = 4 / 2 * test"
 
 
+@_skip_docstring_tests_with_optimized_python
 def test_format_doc_selfInput_simple():
     # Simple tests with self input
 
@@ -790,10 +770,10 @@ def test_format_doc_selfInput_simple():
     def testfunc_1():
         """not test"""
 
-    expected_doc = "not test" if sys.flags.optimize < 2 else None
-    assert inspect.getdoc(testfunc_1) == expected_doc
+    assert inspect.getdoc(testfunc_1) == "not test"
 
 
+@_skip_docstring_tests_with_optimized_python
 def test_format_doc_selfInput_format():
     # Tests with string input which is '__doc__' (special case) and formatting
 
@@ -802,8 +782,7 @@ def test_format_doc_selfInput_format():
     def testfunc1():
         """dum {0} dum {opt}"""
 
-    expected_doc = "dum di dum da dum" if sys.flags.optimize < 2 else None
-    assert inspect.getdoc(testfunc1) == expected_doc
+    assert inspect.getdoc(testfunc1) == "dum di dum da dum"
 
     # Test that we cannot recursively insert the original documentation
 
@@ -811,10 +790,10 @@ def test_format_doc_selfInput_format():
     def testfunc2():
         """dum {0} dum {__doc__}"""
 
-    expected_doc = "dum di dum " if sys.flags.optimize < 2 else None
-    assert inspect.getdoc(testfunc2) == expected_doc
+    assert inspect.getdoc(testfunc2) == "dum di dum "
 
 
+@_skip_docstring_tests_with_optimized_python
 def test_format_doc_onMethod():
     # Check if the decorator works on methods too, to spice it up we try double
     # decorator
@@ -826,10 +805,10 @@ def test_format_doc_onMethod():
         def test_method(self):
             """is {0}"""
 
-    expected_doc = "what we do is strange." if sys.flags.optimize < 2 else None
-    assert inspect.getdoc(TestClass.test_method) == expected_doc
+    assert inspect.getdoc(TestClass.test_method) == "what we do is strange."
 
 
+@_skip_docstring_tests_with_optimized_python
 def test_format_doc_onClass():
     # Check if the decorator works on classes too
     docstring = "what we do {__doc__} {0}{opt}"
@@ -838,14 +817,10 @@ def test_format_doc_onClass():
     class TestClass:
         """is"""
 
-    expected_doc = "what we do is strange." if sys.flags.optimize < 2 else None
-    assert inspect.getdoc(TestClass) == expected_doc
+    assert inspect.getdoc(TestClass) == "what we do is strange."
 
 
-@pytest.mark.skipif(
-    sys.flags.optimize >= 2,
-    reason="NA for Python optimized mode",
-)
+@_skip_docstring_tests_with_optimized_python
 @pytest.mark.parametrize(
     "docstring, expected_exception",
     [
@@ -867,10 +842,7 @@ def test_format_doc_exceptions(docstring, expected_exception):
             pass
 
 
-@pytest.mark.skipif(
-    sys.flags.optimize >= 2,
-    reason="NA for Python optimized mode",
-)
+@_skip_docstring_tests_with_optimized_python
 def test_format_doc_indexerrors():
     def _FUNC_WITH_TEMPLATE_DOCSTRING():
         """test {0} test {opt}"""

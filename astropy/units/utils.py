@@ -11,7 +11,7 @@ from __future__ import annotations
 import io
 import re
 from fractions import Fraction
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, SupportsFloat
 
 import numpy as np
 from numpy import finfo
@@ -19,17 +19,11 @@ from numpy import finfo
 from .errors import UnitScaleError
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Sequence
-    from typing import Literal, SupportsFloat, TypeVar
+    from collections.abc import Generator, Mapping
+    from typing import Literal
 
-    from numpy.typing import NDArray
-
-    from .core import UnitBase
-    from .quantity import Quantity
-    from .typing import Complex, Real, UnitPower, UnitScale
-
-    DType = TypeVar("DType", bound=np.generic)
-    FloatLike = TypeVar("FloatLike", bound=SupportsFloat)
+    from .core import NamedUnit
+    from .typing import UnitPower, UnitPowerLike, UnitScale, UnitScaleLike
 
 
 _float_finfo = finfo(float)
@@ -51,8 +45,8 @@ def _get_first_sentence(s: str) -> str:
 
 
 def _iter_unit_summary(
-    namespace: dict[str, object],
-) -> Generator[tuple[UnitBase, str, str, str, Literal["Yes", "No"]], None, None]:
+    namespace: Mapping[str, object],
+) -> Generator[tuple[NamedUnit, str, str, str, Literal["Yes", "No"]], None, None]:
     """
     Generates the ``(unit, doc, represents, aliases, prefixes)``
     tuple used to format the unit summary docs in `generate_unit_summary`.
@@ -67,6 +61,9 @@ def _iter_unit_summary(
         # Skip non-unit items
         if not isinstance(val, core.UnitBase):
             continue
+
+        if not isinstance(val, core.NamedUnit):
+            raise TypeError(f"{key!r} must be defined with 'def_unit()'")
 
         # Skip aliases
         if key != val.name:
@@ -98,7 +95,7 @@ def _iter_unit_summary(
         )
 
 
-def generate_unit_summary(namespace: dict[str, object]) -> str:
+def generate_unit_summary(namespace: Mapping[str, object]) -> str:
     """
     Generates a summary of units from a given namespace.  This is used
     to generate the docstring for the modules that define the actual
@@ -142,7 +139,7 @@ def generate_unit_summary(namespace: dict[str, object]) -> str:
     return docstring.getvalue()
 
 
-def generate_prefixonly_unit_summary(namespace: dict[str, object]) -> str:
+def generate_prefixonly_unit_summary(namespace: Mapping[str, object]) -> str:
     """
     Generates table entries for units in a namespace that are just prefixes
     without the base unit.  Note that this is intended to be used *after*
@@ -159,7 +156,7 @@ def generate_prefixonly_unit_summary(namespace: dict[str, object]) -> str:
     docstring : str
         A docstring containing a summary table of the units.
     """
-    from . import PrefixUnit
+    from .core import PrefixUnit
 
     faux_namespace = {}
     for unit in namespace.values():
@@ -181,7 +178,7 @@ def generate_prefixonly_unit_summary(namespace: dict[str, object]) -> str:
     return docstring.getvalue()
 
 
-def is_effectively_unity(value: Complex) -> bool:
+def is_effectively_unity(value: UnitScaleLike) -> bool | np.bool_:
     # value is *almost* always real, except, e.g., for u.mag**0.5, when
     # it will be complex.  Use try/except to ensure normal case is fast
     try:
@@ -193,40 +190,25 @@ def is_effectively_unity(value: Complex) -> bool:
         )
 
 
-def sanitize_scale_type(scale: Complex) -> UnitScale:
-    if not scale:
-        raise UnitScaleError("cannot create a unit with a scale of 0.")
-
-    # Maximum speed for regular case where scale is a float.
-    if scale.__class__ is float:
-        return scale
-
-    # We cannot have numpy scalars, since they don't autoconvert to
-    # complex if necessary.  They are also slower.
-    return scale.item() if isinstance(scale, np.number) else scale
-
-
-def sanitize_scale_value(scale: UnitScale) -> UnitScale:
+def sanitize_scale(scale: UnitScaleLike) -> UnitScale:
     if is_effectively_unity(scale):
         return 1.0
-
-    # All classes that scale can be (int, float, complex, Fraction)
-    # have an "imag" attribute.
-    if scale.imag:
-        if abs(scale.real) > abs(scale.imag):
-            if is_effectively_unity(scale.imag / scale.real + 1):
-                return scale.real
-
-        elif is_effectively_unity(scale.real / scale.imag + 1):
-            return complex(0.0, scale.imag)
-
+    if not scale:
+        raise UnitScaleError("cannot create a unit with a scale of 0.")
+    if type(scale) is float:  # float is very common, so handle it fast
         return scale
+    if isinstance(scale, SupportsFloat):
+        return float(scale)
 
-    else:
-        return scale.real
+    if abs(scale.real) > abs(scale.imag):
+        if is_effectively_unity(scale.imag / scale.real + 1):
+            return float(scale.real)
+    elif is_effectively_unity(scale.real / scale.imag + 1):
+        return complex(0.0, scale.imag)
+    return complex(scale)
 
 
-def maybe_simple_fraction(p: Real, max_denominator: int = 100) -> UnitPower:
+def maybe_simple_fraction(p: UnitPowerLike, max_denominator: int = 100) -> UnitPower:
     """Fraction very close to x with denominator at most max_denominator.
 
     The fraction has to be such that fraction/x is unity to within 4 ulp.
@@ -257,7 +239,7 @@ def maybe_simple_fraction(p: Real, max_denominator: int = 100) -> UnitPower:
     return float(p)
 
 
-def sanitize_power(p: Real) -> UnitPower:
+def sanitize_power(p: UnitPowerLike) -> UnitPower:
     """Convert the power to a float, an integer, or a Fraction.
 
     If a fractional power can be represented exactly as a floating point
@@ -297,7 +279,9 @@ def sanitize_power(p: Real) -> UnitPower:
     return p
 
 
-def resolve_fractions(a: Real, b: Real) -> tuple[Real, Real]:
+def resolve_fractions(
+    a: UnitPowerLike, b: UnitPowerLike
+) -> tuple[UnitPowerLike, UnitPowerLike]:
     """
     If either input is a Fraction, convert the other to a Fraction
     (at least if it does not have a ridiculous denominator).
@@ -317,26 +301,3 @@ def resolve_fractions(a: Real, b: Real) -> tuple[Real, Real]:
     elif not a_is_fraction and b_is_fraction:
         a = maybe_simple_fraction(a)
     return a, b
-
-
-@overload
-def quantity_asanyarray(a: Sequence[int]) -> NDArray[int]: ...
-@overload
-def quantity_asanyarray(a: Sequence[int], dtype: DType) -> NDArray[DType]: ...
-@overload
-def quantity_asanyarray(a: Sequence[Quantity]) -> Quantity: ...
-def quantity_asanyarray(
-    a: Sequence[int] | Sequence[Quantity], dtype: DType | None = None
-) -> NDArray[int] | NDArray[DType] | Quantity:
-    from .quantity import Quantity
-
-    if (
-        not isinstance(a, np.ndarray)
-        and not np.isscalar(a)
-        and any(isinstance(x, Quantity) for x in a)
-    ):
-        return Quantity(a, dtype=dtype)
-    else:
-        # skip over some dtype deprecation.
-        dtype = np.float64 if dtype is np.inexact else dtype
-        return np.asanyarray(a, dtype=dtype)

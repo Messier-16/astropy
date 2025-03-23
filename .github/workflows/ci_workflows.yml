@@ -17,6 +17,9 @@ env:
   ARCH_ON_CI: "normal"
   IS_CRON: "false"
 
+permissions:
+  contents: read
+
 jobs:
   initial_checks:
     name: Mandatory checks before CI
@@ -46,7 +49,7 @@ jobs:
 
   tests:
     needs: [initial_checks]
-    uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@d68193b68216da64eafaa618f53c59f5d271c56e  # v1.14.0
+    uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@8c0fde6f7e926df6ed7057255d29afa9c1ad5320  # v1.16.0
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     with:
@@ -91,12 +94,18 @@ jobs:
           posargs: --durations=50 --run-slow
           runs-on: macos-latest
 
+        # FIXME: Add aarch64 to name when bump Python version.
         - name: Python 3.11 Double test (Run tests twice)
           linux: py311-test-double
+          runs-on: ubuntu-24.04-arm
+          posargs: -n=4
+          setenv: |
+            ARCH_ON_CI: "arm64"
+            IS_CRON: "false"
 
   allowed_failures:
     needs: [initial_checks]
-    uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@d68193b68216da64eafaa618f53c59f5d271c56e  # v1.14.0
+    uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@8c0fde6f7e926df6ed7057255d29afa9c1ad5320  # v1.16.0
     with:
       setenv: |
         ARCH_ON_CI: "normal"
@@ -117,7 +126,7 @@ jobs:
     # This ensures that a couple of wheel targets work fine in pull requests and pushes
     permissions:
       contents: none
-    uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish.yml@d68193b68216da64eafaa618f53c59f5d271c56e  # v1.14.0
+    uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish.yml@8c0fde6f7e926df6ed7057255d29afa9c1ad5320  # v1.16.0
     with:
       upload_to_pypi: false
       upload_to_anaconda: false

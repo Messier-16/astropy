@@ -54,10 +54,10 @@ COMPRESSION_KEYWORDS = set(REMAPPED_KEYWORDS.values()).union(
 class CompImageHeader(Header):
     def __init__(self, *args, **kwargs):
         warnings.warn(
-            "The CompImageHeader class is deprecated and will be " "removed in future",
+            "The CompImageHeader class is deprecated and will be removed in future",
             AstropyDeprecationWarning,
         )
-        return super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 def _is_reserved_table_keyword(keyword):
